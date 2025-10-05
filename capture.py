@@ -11,7 +11,6 @@ import threading
 import subprocess
 import time
 import os
-import sys
 import cv2
 import uuid
 import datetime
@@ -27,10 +26,25 @@ CAPTURE_TIMEOUT = 5.0        # seconds
 
 # --------------- Helper functions ---------------
 def mac_address_hex():
-    n = uuid.getnode()
-    mac = ':'.join((hex(n)[i:i+2] for i in range(2,14,2)))
-    return mac.replace(':', '')
+    """Trả về địa chỉ MAC thật (ưu tiên psutil, fallback uuid) ở dạng hex không có dấu :"""
+    try:
+        import psutil
+        addrs = psutil.net_if_addrs()
+        for iface, addr_list in addrs.items():
+            for addr in addr_list:
+                if getattr(addr, 'family', None) in ('AF_LINK', getattr(psutil, 'AF_LINK', None)):
+                    mac = addr.address
+                    if mac and mac != "00:00:00:00:00:00":
+                        return mac.replace(":", "")
+    except Exception:
+        pass
 
+    node = uuid.getnode()
+    mac = ''.join(f'{(node >> ele) & 0xff:02x}' for ele in range(40, -1, -8))
+    first_octet = (node >> 40) & 0xff
+    if first_octet & 0x01:
+        print("⚠️  uuid.getnode() trả về giá trị ngẫu nhiên (không phải MAC thật).")
+    return mac
 def now_timestamp_str():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -69,7 +83,7 @@ def adb_kill_forward_for_device(serial, local_port):
     return code == 0
 
 def adb_start_app(serial, package_activity):
-    # package_activity: e.g. "com.dev47apps.droidcam/.MainActivity" (user may customize)
+
     out, err, code = run_adb(["-s", serial, "shell", "am", "start", "-n", package_activity])
     return code == 0
 
@@ -268,7 +282,6 @@ def log(window, msg):
 
 def main():
     window = make_main_window(DEFAULT_FPS)
-
     # state
     cam_clients = [None, None]
     cam_running = [False, False]
