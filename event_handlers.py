@@ -3,6 +3,36 @@ import time
 import PySimpleGUI as sg
 from utils import log, adb_start_app, adb_input_tap
 from camera_client import CameraClient
+import urllib.request
+CAM_PORTS = [4747, 4748]
+def get_camera_url(cam_idx, action):
+    # cam_num = cam_idx + 1
+    port = CAM_PORTS[cam_idx]
+    return f"http://127.0.0.1:{port}/cam/1/{action}"
+
+
+
+def handle_led_toggle(window, cam_idx):
+    url = get_camera_url(cam_idx, "led_toggle")
+    try:
+        urllib.request.urlopen(url, timeout=2)
+        window["-LOG-"].print(f"LED toggled for cam{cam_idx+1}")
+    except Exception as e:
+        window["-LOG-"].print(f"Error toggling LED for cam{cam_idx+1}: {e}")
+
+
+def handle_zoom(window, cam_idx, zoom_in=True):
+    """
+    cam_idx: 0 hoặc 1
+    zoom_in: True để Zoom In, False để Zoom Out
+    """
+    action = "zoomin" if zoom_in else "zoomout"
+    url = get_camera_url(cam_idx, action)
+    try:
+        urllib.request.urlopen(url, timeout=2)
+        window["-LOG-"].print(f"{'Zoom In' if zoom_in else 'Zoom Out'} executed for cam{cam_idx+1}")
+    except Exception as e:
+        window["-LOG-"].print(f"Error {'Zoom In' if zoom_in else 'Zoom Out'} for cam{cam_idx+1}: {e}")
 def handle_device_added(cam_idx, serial , window, cam_clients, cam_running, cam_save_dirs, session_root, fps, LOCAL_PORTS):
         window[f'-DEV{cam_idx+1}-'].update(serial)
         log(window, f"Device assigned to cam{cam_idx+1}: {serial}")
@@ -67,3 +97,5 @@ def handle_stop_rec(window, cam_clients, cam_saving):
             cam_clients[idx].set_saving(False)
             cam_saving[idx] = False
             log(window, f"Stop recording cam{idx+1}")
+
+

@@ -4,6 +4,7 @@ import subprocess
 import uuid
 import time
 DEVICE_REMOTE_PORT = 4747
+   # Zoom in
 def now_timestamp_str():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -102,7 +103,7 @@ def adb_toggle_led(serial):
     output = run_adb(serial, ["shell", "settings", "put", "system", "torch_enabled", "0"])
     return output is not None
 
-def get_battery_via_adb(serial):
+def get_battery_via_adb(serial,window):
     """Trả về dict thông tin pin qua adb dumpsys battery"""
     out, err, code = run_adb(["-s", serial, "shell", "dumpsys", "battery"])
     if code != 0 or not out:
@@ -128,6 +129,9 @@ def get_battery_via_adb(serial):
                 info["status"] = m.get(st, f"status_{st}")
             except:
                 info["status"] = line.split(":")[1].strip()
+                
+    
+    log(window, f"Battery for {serial}: {info}")
     return info
 
 
@@ -176,20 +180,3 @@ def adb_set_wb_mode(serial, mode):
     print(f"[ADB] Set WB mode {mode} on {serial}")
     return True
 
-
-def adb_set_resolution(serial, width, height):
-    """Set camera resolution."""
-    print(f"[ADB] Set resolution {width}x{height} on {serial}")
-    return True
-
-
-def adb_set_zoom(serial, level):
-    """Set zoom level."""
-    print(f"[ADB] Set zoom {level} on {serial}")
-    return True
-
-
-def adb_set_focus(serial, autofocus=True):
-    """Set autofocus on/off."""
-    print(f"[ADB] Set autofocus={autofocus} on {serial}")
-    return True

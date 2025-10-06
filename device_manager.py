@@ -29,52 +29,68 @@ class DeviceManager(threading.Thread):
 
     def run(self):
         while self.running:
-            devices = list_adb_devices()  # list of (serial, status)
-            serials = [s for s, st in devices if st == "device"]
-            # keep first two devices (order from adb)
-            with self.lock:
-                # remove assigned that no longer present
-                removed = []
-                for cam_idx, serial in list(self.assigned.items()):
-                    if serial not in serials:
-                        removed.append((cam_idx, serial))
-                        # remove forward
-                        try:
-                            adb_kill_forward_for_device(serial, LOCAL_PORTS[cam_idx])
-                        except:
-                            pass
-                        self.window.write_event_value('DEVICE_REMOVED', (cam_idx, serial))
-                        del self.assigned[cam_idx]
-                # assign free cams
-                free_cam_indices = [0,1]
-                for idx in list(self.assigned.keys()):
-                    if idx in free_cam_indices:
-                        free_cam_indices.remove(idx)
-                for s in serials:
-                    if s in self.assigned.values():
-                        continue
-                    if not free_cam_indices:
-                        break
-                    cam_idx = free_cam_indices.pop(0)
-                    ok = adb_forward_for_device(s, LOCAL_PORTS[cam_idx], DEVICE_REMOTE_PORT)
-                    if ok:
-                        self.assigned[cam_idx] = s
-                        self.window.write_event_value('DEVICE_ADDED', (cam_idx, s))
-                    else:
-                        print(f"[DeviceManager] Forward failed for {s} -> local {LOCAL_PORTS[cam_idx]}")
-                        
-                        
-                # poll battery
-                now = time.time()
-                if now - self._last_battery_poll >= BATTERY_POLL_INTERVAL:
-                 print("[DeviceManager] Polling battery status...")
-                 with self.lock:
-                    for cam_idx, serial in self.assigned.items():
-                        info = get_battery_via_adb(serial)
-                        print(f"[DeviceManager] Battery for cam{cam_idx+1} ({serial}): {info}")
-                         # send to main thread
-                        self.window.write_event_value("BATTERY_UPDATE", (cam_idx, serial, info))
-                self._last_battery_poll = now
+            try:
+                devices = list_adb_devices()  # list of (serial, status)
+                serials = [s for s, st in devices if st == "device"]
 
-          
+                removed = []
+                added = []
+
+                # --------------- Lock chỉ khi thao tác dữ liệu ---------------
+                with self.lock:
+                    # xử lý thiết bị bị rút
+                    for cam_idx, serial in list(self.assigned.items()):
+                        if serial not in serials:
+                            removed.append((cam_idx, serial))
+                            try:
+                                adb_kill_forward_for_device(serial, LOCAL_PORTS[cam_idx])
+                            except Exception:
+                                pass
+                            del self.assigned[cam_idx]
+
+                    # tìm các cam trống
+                    free_cam_indices = [0, 1]
+                    for idx in list(self.assigned.keys()):
+                        if idx in free_cam_indices:
+                            free_cam_indices.remove(idx)
+
+                    # assign thiết bị mới
+                    for s in serials:
+                        if s in self.assigned.values():
+                            continue
+                        if not free_cam_indices:
+                            break
+                        cam_idx = free_cam_indices.pop(0)
+                        ok = adb_forward_for_device(s, LOCAL_PORTS[cam_idx], DEVICE_REMOTE_PORT)
+                        if ok:
+                            self.assigned[cam_idx] = s
+                            added.append((cam_idx, s))
+                        else:
+                            print(f"[DeviceManager] Forward failed for {s} -> local {LOCAL_PORTS[cam_idx]}")
+
+                    # poll battery nếu đủ thời gian
+                    now = time.time()
+                    battery_updates = []
+                    if now - self._last_battery_poll >= BATTERY_POLL_INTERVAL:
+                        for cam_idx, serial in self.assigned.items():
+                            try:
+                                print(f"[DeviceManager] Polling battery for cam{cam_idx+1} ({serial})")
+                                info = get_battery_via_adb(serial,self.window)
+                                print(f"[DeviceManager] Battery for cam{cam_idx+1} ({serial}): {info}")
+                                battery_updates.append((cam_idx, serial, info))
+                            except Exception:
+                                pass
+                        self._last_battery_poll = now
+
+                # --------------- Push event ra ngoài lock ---------------
+                for cam_idx, serial in removed:
+                    self.window.write_event_value('DEVICE_REMOVED', (cam_idx, serial))
+                for cam_idx, serial in added:
+                    self.window.write_event_value('DEVICE_ADDED', (cam_idx, serial))
+                for cam_idx, serial, info in battery_updates:
+                    self.window.write_event_value('BATTERY_UPDATE', (cam_idx, serial, info))
+
+            except Exception as e:
+                print(f"[DeviceManager] Error in run loop: {e}")
+
             time.sleep(RECONNECT_INTERVAL)

@@ -6,25 +6,21 @@ droidcam_usb_multi.py
 - Cho phép điều khiển app trên Android (adb start app, adb input tap)
 - Lưu frames vào folder OUTPUT_ROOT/<timestamp>_<MAC>/cam1 and cam2
 """
-
-import threading
 import time
 import os
 import datetime
-import PySimpleGUI as sg
-from camera_client import CameraClient  # tránh circular import
+import PySimpleGUI as sg # tránh circular import
 from utils import (
     adb_start_app,
     adb_input_tap,
     now_timestamp_str,
     mac_address_hex,
-    adb_toggle_led,
-    adb_set_zoom,
+
 )
 from device_manager import DeviceManager
 from ui import make_main_window
-from event_handlers import handle_device_added, handle_device_removed
-from event_handlers import handle_start_rec, handle_device_added, handle_device_removed
+from event_handlers import handle_device_added, handle_device_removed,handle_led_toggle, handle_zoom
+
 
 
 # --------------- Config mặc định ---------------
@@ -65,7 +61,7 @@ def main():
     # start device manager
     devmgr = DeviceManager(window)
     devmgr.start()
-
+   
     # event loop
     try:
         while True:
@@ -146,33 +142,20 @@ def main():
                         cam_clients[idx].set_saving(False)
                         cam_saving[idx] = False
                         log(window, f"Stop recording cam{idx+1}")
-            if event == "-LED_TOGGLE-":
-                    log(window, "Toggled LED ON/OFF on both cameras")
-                    print("[Main] Toggling LED on all assigned devices...", flush=True)
+            if event == '-LED1-':
+                   handle_led_toggle(window, cam_idx=0)
+            if event == '-LED2-':
+                   handle_led_toggle(window, cam_idx=1)
+            if event == '-ZOOMIN1-':
+                   handle_zoom(window, cam_idx=0, zoom_in=True)
+            if event == '-ZOOMOUT1-':
+                   handle_zoom(window, cam_idx=0, zoom_in=False)
+            if event == '-ZOOMIN2-':
+                   handle_zoom(window, cam_idx=1, zoom_in=True)
+            if event == '-ZOOMOUT2-':
+                   handle_zoom(window, cam_idx=1, zoom_in=False)
 
-                    for cam_idx, serial in devmgr.assigned.items():
-                      def led_thread(serial, cam_idx):
-                          print(f"[ADB] Toggling LED cam{cam_idx+1} ({serial})...", flush=True)
-                          ok = adb_toggle_led(serial)
-                          log(window, f"adb toggle LED cam{cam_idx+1} ({serial}): {ok}")
 
-                      threading.Thread(target=led_thread, args=(serial, cam_idx), daemon=True).start()
-
-            if event == "-ZOOM_IN-":
-                for cam_idx, serial in devmgr.assigned.items():
-                    try:
-                        # Lưu ý: bạn có thể track zoom hiện tại trong dict riêng nếu muốn
-                        ok = adb_set_zoom(serial, "in")  # hoặc level = hiện tại + 1
-                        log(window, f"Zoom + cam{cam_idx+1} ({serial}): {ok}")
-                    except Exception as e:
-                        log(window, f"Error zoom cam{cam_idx+1}: {e}")
-            if event == "-ZOOM_OUT-":
-                for cam_idx, serial in devmgr.assigned.items():
-                    try:
-                        ok = adb_set_zoom(serial, "out")  # hoặc level = hiện tại - 1
-                        log(window, f"Zoom - cam{cam_idx+1} ({serial}): {ok}")
-                    except Exception as e:
-                        log(window, f"Error zoom cam{cam_idx+1}: {e}")
             if event == "-WB_SETTINGS-":
                 sg.popup(
                     "WB Settings placeholder",
@@ -194,6 +177,7 @@ def main():
                 sg.popup_ok(f"Camera {cam_idx+1} error: {errstr}")
 
             if event == "DEVICE_ADDED":
+                print(f"[Main] DEVICE_ADDED event: {values[event]}", flush=True)
                 cam_idx, serial = values[event]
                 handle_device_added(
                     cam_idx,
@@ -208,10 +192,15 @@ def main():
                 )
 
             if event == "DEVICE_REMOVED":
+                print(f"[Main] DEVICE_REMOVED event: {values[event]}", flush=True)
                 cam_idx, serial = values[event]
                 handle_device_removed(
                     cam_idx, serial, window, cam_clients, cam_running
                 )
+                
+                
+                
+                
 
     finally:
         # cleanup
