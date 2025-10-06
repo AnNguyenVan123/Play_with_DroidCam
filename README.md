@@ -29,14 +29,16 @@ cd Play_with_DroidCam
 python -m pip install -r requirements.txt
 
 ⚙️ Setup: Connect Android via USB
-Step 1. Install DroidCam on your phone
+
+### Step 1. Install DroidCam on your phone
 
 Download the app on your Android device:
+
 👉 https://play.google.com/store/apps/details?id=com.dev47apps.droidcam
 
 Run the app once — it will automatically start a camera server on port 4747 by default.
 
-Step 2. Enable Developer Options & USB Debugging
+### Step 2. Enable Developer Options & USB Debugging
 
 Open Settings → About phone → Build number
 
@@ -58,7 +60,7 @@ adb devices
 ✅ You should see your device’s serial number listed.
 
 
-### Step 4. Run the app
+### Step 3. Run the app
 
 Start the camera control program:
 
