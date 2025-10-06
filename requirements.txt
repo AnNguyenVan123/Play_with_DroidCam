@@ -1,2 +1,4 @@
 opencv-python
 pysimplegui
+psutil
+adbutils
