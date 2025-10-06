@@ -57,19 +57,6 @@ adb devices
 
 ✅ You should see your device’s serial number listed.
 
-### Step 3. Forward DroidCam port
-
-The DroidCam server on your phone listens on port 4747.
-
-Forward that port to your local PC:
-
-adb forward tcp:4747 tcp:4747
-
-
-If using multiple Android devices (e.g., two cameras):
-
-adb forward tcp:4747 tcp:4747
-adb forward tcp:4748 tcp:4747
 
 ### Step 4. Run the app
 
